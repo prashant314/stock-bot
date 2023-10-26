@@ -25,7 +25,6 @@ node bot.js
 
 Enter the stock symbol: AAPL
 Enter the percentage change threshold: 10
-
 The bot is now running. You will receive a notification if the stock price of AAPL changes by more than 10%. -->
 
 ## Contributing

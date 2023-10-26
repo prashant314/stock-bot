@@ -1,6 +1,8 @@
 const puppeteer = require('puppeteer');
 const axios = require('axios');
 const schedule = require('node-schedule');
+const winston = require('winston');
+const { combine, timestamp, printf, colorize, align } = winston.format;
 
 const baseUrl = 'https://www.hmtwatches.in/';
 const credentials = {
@@ -16,15 +18,28 @@ let productsToCheck = [
   }
 ]
 
+const logger = winston.createLogger({
+  level: 'info',
+  format: combine(
+    colorize({ all: true }),
+    timestamp({
+      format: 'YYYY-MM-DD hh:mm:ss.SSS A',
+    }),
+    align(),
+    printf((info) => `[${info.timestamp}] ${info.level}: ${info.message}`)
+  ),
+  transports: [new winston.transports.Console()],
+});
+
 let job = null;
 async function init() {
-  console.log('Init app....')
+  logger.info('Init app....')
   // Schedule the task
   job = schedule.scheduleJob('*/1 * * * *', checkStockAsync);
 }
 
 async function checkStockAsync() {
-  console.log('Starting job')
+  logger.info('Starting job')
   let availableProducts = [];
   for (let product of productsToCheck) {
 
@@ -40,14 +55,14 @@ async function checkStockAsync() {
     }
   }
 
-  console.log("Number of available products: " + availableProducts.length);
+  logger.info("Number of available products: " + availableProducts.length);
 
   // Notify if products available
   if (availableProducts.length != 0) {
     // notify(availableProducts);
     let productToBuy = availableProducts.find((p) => p.buy === true);
     if (productToBuy) {
-      console.log("Buy product: " + productToBuy.name);
+      logger.info("Buy product: " + productToBuy.name);
       job.cancelNext();
       try {
         addProductToCart(productToBuy);
@@ -58,10 +73,10 @@ async function checkStockAsync() {
         }
       }
     } else {
-      console.log("No available products needs to be added to cart..")
+      logger.info("No available products needs to be added to cart..")
     }
   } else {
-    console.log("No products in stock!")
+    logger.info("No products in stock!")
   }
 }
 
@@ -71,13 +86,13 @@ async function checkStockForProduct(product) {
   let response = await axios.get(apiUrl);
   let stockStatus = response.data.product_details.in_stock;
 
-  console.log(`Stock Status for ${product.name}:`, stockStatus);
+  logger.info(`Stock Status for ${product.name}:`, stockStatus);
 
   return response.data.product_details;
 }
 
 async function login() {
-  console.log("Start login..")
+  logger.info("Start login..")
   //   const browser = await puppeteer.launch();
   const browser = await puppeteer.launch({
     headless: false,
@@ -98,28 +113,28 @@ async function login() {
   // Wait for the user to be logged in (adjust the selector as needed)
   await page.waitForSelector('#home');
 
-  console.log("Logged in....")
+  logger.info("Logged in....")
 
   return page;
 }
 
 async function addProductToCart(product) {
-  console.log("Add product to cart...")
+  logger.info("Add product to cart...")
   let page = await login();
   // Navigate to the product page
-  console.log("Going to product page....")
+  logger.info("Going to product page....")
   await page.goto(product.url);
-  console.log("Adding product to cart....")
+  logger.info("Adding product to cart....")
   await page.click('.update_cart_product');
   setTimeout(function () {
-    console.log("Added to cart");
+    logger.info("Added to cart");
   }, 2000);
   await page.goto('https://www.hmtwatches.in/cart');
   await page.waitForSelector('.btn-cart');
   await page.click('input.btn.btn-cart.validate_product');
-  console.log("checkout button clicked...");
+  logger.info("checkout button clicked...");
   await page.waitForNavigation();
-  console.log("clicking radios...");
+  logger.info("clicking radios...");
   await page.waitForSelector('.billing_address');
   await page.click('input.billing_address');
   await page.evaluate(() => {
